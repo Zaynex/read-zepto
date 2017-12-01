@@ -1,0 +1,6 @@
+.DS_Store
+dist/zepto.min.js
+dist/zepto.js
+pkg
+
+.vscode/

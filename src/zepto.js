@@ -1,3 +1,31 @@
+//--------先看第一行以及最后一行-----------//
+/**
+ * 首先整体采用匿名函数包裹的自执行方式，这样的方法的好处就是利用函数作用域的特性，不会让函数内部使用的变量污染到函数外部
+ * CopyZepto 就是 函数执行的结果，return 了 X。所以 CopyZepto 就是 X
+ * 最后我们将X 赋值给 window对象，以供全局调用
+ */
+
+var CopyZepto = (function(){
+  // 可以理解为 X 就是 $
+  function X(dom,context) {
+    console.log('dom node',dom, 'context', context)
+  }
+  X.ok = 'ok'
+  return X
+})()
+
+'X' in window || (window.X = CopyZepto)
+
+/**
+ * 照着以上方式，我们可以调用 X.ok 方法了。所以我们很多方法就可以在X下面注册
+ * 那么如何实现链式调用呢？ 比如 X('span').css('color:red').show()
+ */
+
+
+
+
+
+
 var Zepto = (function() {
   var slice=[].slice, d=document,
     ADJ_OPS={append: 'beforeEnd', prepend: 'afterBegin', before: 'beforeBegin', after: 'afterEnd'},
@@ -15,6 +43,7 @@ var Zepto = (function() {
      */
     String.prototype.trim = function(){ return this.replace(/^\s+/, '').replace(/\s+$/, '') };
 
+  // 利用 通过call来改变this的指向，也就是说 slice会对 call里面传入的参数进行调用, 确保其转成数组
   function $$(el, selector){ return slice.call(el.querySelectorAll(selector)) }
 
   /**
@@ -46,18 +75,30 @@ var Zepto = (function() {
    * @param {*} context
    */
   function $(_, context){
-    // 绑定 this 值
+    /**
+     * 在 zepto 的用法中，
+     * $('span', $('p'))    // same
+     * $('p').find('span')  // same
+     *
+     * 所以会用到 find
+     */
     if(context !== void 0) return $(context).find(_);
-    function fn(_){ return fn.dom.forEach(_), fn }
+    // $.fn 中的 this 指向的是 这个函数
+    // 逗号表达式，前面执行完了，返回的是后面的值。
+    // 当你想要在期望一个表达式的位置包含多个表达式时，可以使用逗号操作, 作者应该是出于简洁考虑吧
+    function fn(_){ return fn.dom.forEach(_),console.log(_), fn }
 
     /**
      * 检查传入的 _ 类型，做相应的处理
+     * 如果传入的是一个数组那 fn.dom 就是这个数组
+     * 如果传入的是一个 Element,那么还是把它转换成数组
+     * 如果不是 element 那么就通过 $$ 选择器去找到 相应的元素，注意 $$ 即 document.querySelector 返回的也是数组，每项都是 DOM节点
      */
-
-    fn.dom = compact((typeof _ == 'function' && 'dom' in _) ?
-      _.dom : (_ instanceof Array ? _ :
-        (_ instanceof Element ? [_] :
-          $$(d, fn.selector = _))));
+    fn.dom = compact(
+      (typeof _ == 'function' && 'dom' in _) ?  _.dom
+        : (_ instanceof Array ? _ : (_ instanceof Element ? [_]
+          : $$(d, fn.selector = _)))
+      );
 
     // 使 fn 函数继承 $.fn 的各种方法
     $.extend(fn, $.fn);
@@ -72,7 +113,7 @@ var Zepto = (function() {
   camelize = function(str){ return str.replace(/-+(.)?/g, function(match, chr){ return chr ? chr.toUpperCase() : '' }) }
 
   $.fn = {
-    compact: function(){ this.dom=compact(this.dom); return this },
+    compact: function(){ console.log(this);this.dom=compact(this.dom); return this },
     get: function(idx){ return idx === void 0 ? this.dom : this.dom[idx] },
     remove: function(){
       return this(function(el){ el.parentNode.removeChild(el) });
@@ -85,6 +126,11 @@ var Zepto = (function() {
     find: function(selector){
       return $(this.dom.map(function(el){ return $$(el, selector) }).reduce(function(a,b){ return a.concat(b) }, []));
     },
+
+    /**
+     * nodes 表示所有和  selector相同的一个数组
+     * this.dom[0] 表示的是你传入的DOM的第一个数， 因为是 通过 document.querySelectorAll(dom) 去取的，所以[0] 是默认第一个
+     */
     closest: function(selector){
       var el = this.dom[0].parentNode, nodes = $$(d, selector);
       while(el && nodes.indexOf(el)<0) el = el.parentNode;
@@ -118,8 +164,10 @@ var Zepto = (function() {
     index: function(el){
       return this.dom.indexOf($(el).get(0));
     },
+    // 绑定多个事件,其实就是将字符串分割数组后依次注册事件
     bind: function(event, callback){
       return this(function(el){
+        // event.split(' ').forEach(function(event){el.addEventListener(event ,callback, false)})
         event.split(/\s/).forEach(function(event){ el.addEventListener(event, callback, false); });
       });
     },
