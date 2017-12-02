@@ -19,10 +19,29 @@ var CopyZepto = (function(){
 /**
  * 照着以上方式，我们可以调用 X.ok 方法了。所以我们很多方法就可以在X下面注册
  * 那么如何实现链式调用呢？ 比如 X('span').css('color:red').show()
+ *
+ * 首先作者在内部创建了  fn 函数，这个函数就是 $() 调用的返回值
+ * 然后通过 extends 方法，让$.fn里所有的方法都挂载到 fn函数上，fn也拥有相同方法了。
+ *  所以其实 $("a")  就是在调用 fn("a")
+ * $("a").get() 就是在调用 fn("a").get()
+ * 好，注意以下关键点
+ * 如果一个函数中有this，这个函数有被上一级的对象所调用，那么this指向的就是上一级的对象。
  */
 
+  /**
+   * this test
+   */
+//  X = {
+//   get: function() {return this.a},
+//   a: 'I am fn a '
+//  }
+// 所以 this 就指向这个 fn 函数了
 
-
+/**
+ * 那么又是如何支持链式调用的呢？
+ * 仔细看 fn(_) 这个函数，结尾返回了 fn 自己。而 fn本身就挂载了超级多的方法，当然可以继续调用啦
+ * 你可以理解为最后又返回了 this
+ */
 
 
 
@@ -86,7 +105,14 @@ var Zepto = (function() {
     // $.fn 中的 this 指向的是 这个函数
     // 逗号表达式，前面执行完了，返回的是后面的值。
     // 当你想要在期望一个表达式的位置包含多个表达式时，可以使用逗号操作, 作者应该是出于简洁考虑吧
-    function fn(_){ return fn.dom.forEach(_),console.log(_), fn }
+
+    /**
+     * 作者写的有点绕
+     * 我们可以看到 $.fn下面有一些列 this(func)的调用，其实就是调用 fn(_)
+     * 那么this 是如何指向 fn的 ?
+     * 首先 fn 通过 extends 直接获得了各种方法
+     */
+    function fn(_){ return fn.dom.forEach(_), fn }
 
     /**
      * 检查传入的 _ 类型，做相应的处理
@@ -103,6 +129,8 @@ var Zepto = (function() {
     // 使 fn 函数继承 $.fn 的各种方法
     $.extend(fn, $.fn);
     return fn;
+
+    // 所以 $ 调用的是 fn
   }
 
   // for in 遍历一个对象的可枚举属性，就是自身属性以及通过原型链继承的属性(__proto__)，
@@ -113,7 +141,7 @@ var Zepto = (function() {
   camelize = function(str){ return str.replace(/-+(.)?/g, function(match, chr){ return chr ? chr.toUpperCase() : '' }) }
 
   $.fn = {
-    compact: function(){ console.log(this);this.dom=compact(this.dom); return this },
+    compact: function(){ this.dom=compact(this.dom); return this },
     get: function(idx){ return idx === void 0 ? this.dom : this.dom[idx] },
     remove: function(){
       return this(function(el){ el.parentNode.removeChild(el) });
